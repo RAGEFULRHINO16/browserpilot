@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BrowserPilot</title>
+  <style>
+    body { width: 340px; margin: 0; padding: 18px; background: linear-gradient(145deg,#10221e,#1b3730); color: #f3f2e9; font: 14px/1.45 Georgia, serif; }
+    h1 { margin: 0 0 8px; font-size: 23px; font-weight: 500; }
+    p { margin: 8px 0; }
+    small { color: #b7cac0; }
+    button { width: 100%; margin-top: 14px; padding: 10px; border: 0; border-radius: 6px; background: #d8c99b; color: #10221e; font: 700 13px Arial, sans-serif; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: default; }
+    input, textarea { width: 100%; box-sizing: border-box; padding: 9px; margin-top: 4px; color: #10221e; }
+    textarea { min-height: 58px; resize: vertical; }
+    .secondary { background: #27483d; color: #f3f2e9; font-size: 11px; }
+    label { display: block; margin-top: 14px; }
+    .status { margin-top: 12px; min-height: 18px; color: #d8c99b; }
+  </style>
+</head>
+<body>
+  <h1>BrowserPilot</h1>
+  <p>Give your agent access to the websites you choose. Actions run in a dedicated BrowserPilot group.</p>
+  <small>Local action approvals protect changes. Complete passwords, passkeys and verification yourself.</small>
+  <label>Browser profile <input id="profile" maxlength="32" value="default" spellcheck="false"></label>
+  <label>Local pairing code <textarea id="pairing" maxlength="300" spellcheck="false" placeholder="JSON from browserpilot pair" autocomplete="off"></textarea></label>
+  <button id="save">Save and connect</button>
+  <label>Website to approve <input id="site" type="url" placeholder="https://example.com" spellcheck="false"></label>
+  <button id="grant">Approve this website</button>
+  <div id="granted"></div>
+  <button id="forget" class="secondary">Remove local pairing</button>
+  <p class="status" id="status" role="status" aria-live="polite"></p>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

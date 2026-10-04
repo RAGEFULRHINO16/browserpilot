@@ -1,0 +1,11 @@
+BrowserPilot is maintained by Magarish Muhunthan (GitHub: RAGEFULRHINO16).
+Development and release preparation used AI coding assistance.
+
+BrowserPilot is independent of OpenAI, Anthropic, Google, Microsoft and Brave.
+Product names belong to their respective owners. No endorsement is implied.
+
+Runtime dependencies retain their own licenses and notices, including the
+Model Context Protocol SDK (MIT), Playwright (Apache-2.0), Next.js (MIT), React
+(MIT), ws (MIT), zod (MIT), dotenv (BSD-2-Clause) and jose (MIT).
+Dependency code is installed from npm and is not vendored in this repository.
+No browser binaries or tunnel client binaries are distributed by BrowserPilot.

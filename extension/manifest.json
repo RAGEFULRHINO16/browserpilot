@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "BrowserPilot",
+  "version": "0.4.0",
+  "minimum_chrome_version": "116",
+  "description": "Connect approved browser tabs to your local AI agent with per-site permissions and local action approvals.",
+  "permissions": ["tabs", "tabGroups", "scripting", "debugger", "downloads", "storage", "alarms"],
+  "host_permissions": ["http://127.0.0.1/*"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_title": "BrowserPilot", "default_popup": "popup.html" }
+}

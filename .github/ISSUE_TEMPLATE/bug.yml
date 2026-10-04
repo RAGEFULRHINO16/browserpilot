@@ -1,0 +1,16 @@
+name: Bug report
+description: Report a reproducible BrowserPilot problem without private account data.
+body:
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include OS, browser, Node version, backend and expected result. Remove tokens and account data.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Actual result and relevant errors
+    validations:
+      required: true

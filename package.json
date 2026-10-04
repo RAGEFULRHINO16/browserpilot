@@ -1,0 +1,50 @@
+{
+  "name": "browserpilot",
+  "type": "module",
+  "version": "0.4.0",
+  "description": "Local browser control for MCP agents with session-aware Chromium extension and Playwright backends.",
+  "license": "MIT",
+  "author": "Magarish Muhunthan",
+  "repository": { "type": "git", "url": "git+https://github.com/RAGEFULRHINO16/browserpilot.git" },
+  "homepage": "https://github.com/RAGEFULRHINO16/browserpilot#readme",
+  "bugs": { "url": "https://github.com/RAGEFULRHINO16/browserpilot/issues" },
+  "engines": { "node": ">=22" },
+  "bin": { "browserpilot": "dist/cli/index.js" },
+  "files": ["dist", "extension", "docs", "README.md", "LICENSE", "SECURITY.md", "NOTICE"],
+  "keywords": ["mcp", "browser", "automation", "agents", "local-first", "playwright"],
+  "scripts": {
+    "dev": "next dev",
+    "build": "node scripts/build.mjs",
+    "build:web": "next build",
+    "start": "next start -H 127.0.0.1",
+    "companion": "tsx companion/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test companion/*.test.ts lib/*.test.ts mcp/*.test.ts cli/*.test.ts scripts/*.test.mjs",
+    "test:extension": "node scripts/extension-smoke.mjs",
+    "test:mcp": "tsx --test mcp/*.test.ts",
+    "audit:release": "node scripts/release-audit.mjs",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.1.0",
+    "dotenv": "^17.0.0",
+    "jose": "^6.1.0",
+    "mcp-handler": "^2.2.0",
+    "next": "^16.3.6",
+    "playwright": "^1.63.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "ws": "^8.22.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.1.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/ws": "^8.18.1",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
