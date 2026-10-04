@@ -31,6 +31,11 @@ runs the core build/typecheck/tests/advisory check on Windows, Linux and macOS
 using Node.js 22, and the Chromium extension smoke on Windows. Consult a specific
 run for observed results; a workflow definition is not proof of a passing run.
 
+The [initial release run](https://github.com/RAGEFULRHINO16/browserpilot/actions/runs/37188744313)
+completed successfully: all three OS core jobs and the Windows Chromium-extension
+job passed using Node.js 22. This establishes the exercised CLI/protocol paths,
+not every browser/backend combination on all platforms.
+
 ## Not established by these tests
 
 There is no independent penetration-test certification, provider certification,
