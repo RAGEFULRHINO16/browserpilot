@@ -53,6 +53,8 @@ test("guided setup preserves credentials and doctor never prints them", async ()
     const saved = JSON.parse(await readFile(path.join(root, "config.json"), "utf8"));
     const report = JSON.parse(setup.stdout);
     assert.equal(report.configured, true);
+    assert.match(report.nextSteps[0], /WARNING:.*real browser profile/);
+    assert.match(report.nextSteps[0], /not a session sandbox/);
     assert.match(report.nextSteps.join(" "), /Save and connect/);
     assert.match(report.nextSteps.join(" "), /approve each website/);
     assert.equal(setup.stdout.includes(saved.token), false);

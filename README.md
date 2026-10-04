@@ -56,10 +56,30 @@ git clone https://github.com/RAGEFULRHINO16/browserpilot.git
 cd browserpilot
 npm ci --workspaces=false
 npm run build
-node dist/cli/index.js setup --client generic
-node dist/cli/index.js pair
-node dist/cli/index.js doctor
+node dist/cli/index.js setup --backend playwright --client generic
+npx playwright install chromium
 ```
+
+**Start with the isolated profile.** The commands above create a separate browser
+profile, without copying your daily browser's accounts. Connect your MCP client
+using the configuration printed by `setup` (it includes the correct local paths
+and environment). The companion and browser start when the client connects.
+Run `node dist/cli/index.js doctor` afterwards to check readiness. Sign in directly
+in that dedicated browser only if your task needs it; sandboxing stays enabled.
+
+Setup preserves existing settings. If you already configured extension mode,
+`--backend playwright` will not silently migrate it: use a fresh
+`BROWSERPILOT_DATA_DIR`, as documented in [configuration](docs/CONFIGURATION.md).
+Keep the generated MCP environment when connecting that separate installation.
+
+### Optional: use your existing Chromium sign-ins
+
+**Warning before attaching a real profile:** your agent can read private account
+data on granted sites. A BrowserPilot tab group is not a session sandbox. Use a
+dedicated browser profile or isolated mode for tasks you do not fully trust.
+
+For a fresh installation, use `setup --backend extension --client generic` and
+then `node dist/cli/index.js pair`. Existing installations retain their backend.
 
 1. Open your browser's extensions page, enable developer mode, choose **Load
    unpacked**, and select the repository's `extension` directory.
@@ -108,7 +128,7 @@ requires a separate supported tunnel/authentication setup. The public release's
 optional HTTP endpoint is authenticated and loopback-only; it does not publish
 your browser on the internet. See [client integrations](docs/CLIENTS.md).
 
-### Use an isolated Playwright profile instead
+### Headless isolated operation
 
 Initialize a fresh data directory with `init --backend playwright --headless`, then
 install Chromium once using `npx playwright install chromium`. Omit `--headless`
@@ -117,10 +137,12 @@ your daily browser. Chromium sandboxing stays enabled.
 
 ## Approve actions
 
-Tools return `approvalRequired`, `approvalId` and a local `approvalUrl` when an
+Tools return `approvalRequired`, `approvalId`, `requestDigest` and a local `approvalUrl` when an
 action needs confirmation. Review the exact request on that page and select
-**Approve once**, then repeat the tool request with its `approvalId`. Changed
-URLs, targets or entered text invalidate the approval. The local approval page
+**Approve once**, then repeat the tool request with its `approvalId`. The page
+shows a 12-character SHA-256 prefix (hover for the full digest) for comparing the
+exact request and its bound context. This is an identifier, not a security seal.
+Changed URLs, targets or entered text invalidate the approval. The local approval page
 is never included as a remotely controllable agent tab.
 
 Files selected for upload must first be staged with `browser_stage_file` or

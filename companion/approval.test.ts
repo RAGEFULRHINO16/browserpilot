@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createHash } from "node:crypto";
 import { ApprovalGate, requiresActionApproval } from "./approval";
 
 test("sensitive actions require one local approval bound to the exact action", () => {
@@ -31,6 +32,9 @@ test("approval binding includes destination and entered text; HTML never trusts 
   assert.equal(pending.approvalUrl, "http://127.0.0.1:12345/approvals");
   assert.equal(gate.prepare(action, "duplicate").approvalId, pending.approvalId);
   const html = gate.html();
+  assert.equal(pending.requestDigest, createHash("sha256").update(JSON.stringify(action)).digest("hex"));
+  assert.ok(html.includes(`title="${pending.requestDigest}"`));
+  assert.ok(html.includes(`>${pending.requestDigest.slice(0, 12)}</code>`));
   assert.equal(html.includes("<script>"), false);
   assert.equal(html.includes("<img src=x>"), false);
   const csrf = html.match(/name="csrf" value="([a-f0-9]+)"/)?.[1];

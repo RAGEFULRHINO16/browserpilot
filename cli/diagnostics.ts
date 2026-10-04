@@ -38,6 +38,7 @@ export function setupSteps(config: BrowserPilotConfig, extensionDirectory: strin
     "Run browserpilot doctor after connecting to check browser readiness.",
   ];
   return [
+    "WARNING: extension mode shares your real browser profile's sign-ins. A tab group is not a session sandbox; granted sites may expose private account data to your agent. Prefer an isolated Playwright profile for untrusted tasks.",
     `Open brave://extensions or chrome://extensions, enable Developer mode, choose Load unpacked, and select ${extensionDirectory}.`,
     "Run browserpilot pair. Paste its private JSON into the extension popup's Local pairing code field, choose a profile name, and click Save and connect.",
     "In the popup, approve each website you want the agent to use. Start with https://example.com for a simple browser_open test.",

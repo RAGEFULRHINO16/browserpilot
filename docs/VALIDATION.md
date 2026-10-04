@@ -1,5 +1,29 @@
 # Release validation
 
+## Locally observed feedback regressions for 0.5.1
+
+The approval page displays a 12-character SHA-256 request prefix and the full
+digest on hover; the tool result returns `requestDigest`. A unit assertion checks
+that it hashes the exact bound action rather than the display description.
+The README's primary setup uses isolated Playwright; optional extension setup
+and CLI guidance warn about shared sign-ins before attaching a real profile.
+Existing configurations are preserved, not migrated by a documentation change.
+
+The sandboxed Chromium extension fixture reads a page instructing an agent to
+upload a staged file. The upload remains pending; a click grant cannot authorize
+it, a changed staged-file ID requires fresh approval, the exact approved upload
+succeeds, and replay of the consumed grant is rejected. This is a deterministic
+tool-boundary regression, not an LLM prompt-injection evaluation or a claim that
+malicious content cannot persuade a user to approve an unsafe action.
+
+Observed locally on Windows with Node.js 24.13.0: build/typecheck passed, all
+52 core tests passed with the opt-in real Chromium fixture enabled, the extension
+smoke and optional HTTP test passed, the fresh production-package test completed
+its 50-tool MCP handshake/file transfer/process cleanup, and the production
+advisory check reported zero vulnerabilities. These checks did not touch the
+maintainer's personal browser profile. Consult the release's linked CI run for
+cross-platform results.
+
 ## Locally observed results for 0.5.0
 
 On Windows 10.0.26200 x64 with Node.js 24.13.0, the public production archive

@@ -1,7 +1,7 @@
 {
   "name": "@browserpilot/http-adapter",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "type": "module",
   "description": "Optional authenticated loopback HTTP adapter for BrowserPilot",
   "engines": { "node": ">=22" },

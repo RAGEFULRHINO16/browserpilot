@@ -1,8 +1,10 @@
 {
   "name": "browserpilot",
   "type": "module",
-  "version": "0.5.0",
-  "workspaces": ["web-adapter"],
+  "version": "0.5.1",
+  "workspaces": [
+    "web-adapter"
+  ],
   "description": "Local browser control for MCP agents with session-aware Chromium extension and Playwright backends.",
   "license": "MIT",
   "author": "Magarish Muhunthan",
