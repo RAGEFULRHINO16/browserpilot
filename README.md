@@ -16,7 +16,13 @@ The extension starts with public websites **unapproved**. You grant websites
 from its popup, and actions such as clicks, typing, selection, upload and download
 triggers require a one-use approval on your PC. Read the [security boundaries](SECURITY.md)
 before connecting a profile with sensitive accounts. This is an early public
-release with AI-assisted development, not an independently audited security product.
+ release with AI-assisted development, not an independently audited security product.
+
+The current release adds a read-only `browserpilot doctor` command, bounded startup
+and owned-process recovery, truthful browser-connected status, extension reconnect
+feedback, expired-command rejection, workflow journal recovery, and structured MCP
+errors that warn before repeating an ambiguous write. Existing daily browser
+connections are not migrated automatically.
 
 The [latest release](https://github.com/RAGEFULRHINO16/browserpilot/releases/latest)
 includes a compiled npm-format archive and SHA-256 checksum. It is not published
@@ -48,10 +54,11 @@ see [validation](docs/VALIDATION.md) for the versions actually tested.
 ```sh
 git clone https://github.com/RAGEFULRHINO16/browserpilot.git
 cd browserpilot
-npm ci
+npm ci --workspaces=false
 npm run build
-node dist/cli/index.js init
+node dist/cli/index.js setup --client generic
 node dist/cli/index.js pair
+node dist/cli/index.js doctor
 ```
 
 1. Open your browser's extensions page, enable developer mode, choose **Load
@@ -66,6 +73,11 @@ Configuration is generated in your OS user data directory, not in the repository
 Use `node dist/cli/index.js status` to check connectivity. For an already occupied
 port, initialize a separate data directory with `init --port 8875`. Custom settings
 are documented in [configuration](docs/CONFIGURATION.md).
+
+The stdio install intentionally excludes the optional Next.js/React HTTP adapter.
+If you need the authenticated loopback web adapter, run `npm install` at the
+repository root, then `npm run build:web` and `npm start`. It requires an
+independent `BROWSERPILOT_MCP_TOKEN`; never reuse the companion token.
 
 ### Connect any local MCP client
 
@@ -123,6 +135,8 @@ MCP file content does not automatically create a file in a hosted chat sandbox.
 npm run build
 npm run typecheck
 npm test
+npm run test:package
+npm run test:http
 npx playwright install chromium
 npm run test:extension
 ```

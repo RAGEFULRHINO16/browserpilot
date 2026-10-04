@@ -20,7 +20,20 @@ jobs:
       - run: npm run build
       - run: npm run typecheck
       - run: npm test
+      - run: npm run test:package
       - run: npm audit --omit=dev --audit-level=high
+  http-adapter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:http
+      - run: npm run typecheck --workspace @browserpilot/http-adapter
+      - run: npm run build:web
   extension:
     runs-on: windows-latest
     steps:

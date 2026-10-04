@@ -27,11 +27,12 @@ export function defaultDataDirectory(): string {
 }
 
 export async function loadConfig(options: { create?: boolean; defaults?: Partial<z.infer<typeof storedSchema>> } = {}): Promise<BrowserPilotConfig> {
-  const dataDir = path.resolve(process.env.BROWSERPILOT_DATA_DIR || defaultDataDirectory());
-  const configPath = path.resolve(process.env.BROWSERPILOT_CONFIG_PATH || path.join(dataDir, "config.json"));
+  // Private OS state is read at runtime, never bundled as a web deployment input.
+  const dataDir = path.resolve(/* turbopackIgnore: true */ process.env.BROWSERPILOT_DATA_DIR || defaultDataDirectory());
+  const configPath = path.resolve(/* turbopackIgnore: true */ process.env.BROWSERPILOT_CONFIG_PATH || path.join(dataDir, "config.json"));
   let stored: Partial<z.infer<typeof storedSchema>> = {};
   try {
-    stored = storedSchema.parse(JSON.parse(await readFile(configPath, "utf8")));
+    stored = storedSchema.parse(JSON.parse(await readFile(/* turbopackIgnore: true */ configPath, "utf8")));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw new Error(`Invalid BrowserPilot configuration: ${configPath}`, { cause: error });
     if (!process.env.BROWSERPILOT_COMPANION_TOKEN && !options.create) {
@@ -44,7 +45,7 @@ export async function loadConfig(options: { create?: boolean; defaults?: Partial
         await writeFile(configPath, `${JSON.stringify(stored, null, 2)}\n`, { mode: 0o600, flag: "wx" });
       } catch (writeError) {
         if ((writeError as NodeJS.ErrnoException).code !== "EEXIST") throw writeError;
-        stored = storedSchema.parse(JSON.parse(await readFile(configPath, "utf8")));
+        stored = storedSchema.parse(JSON.parse(await readFile(/* turbopackIgnore: true */ configPath, "utf8")));
       }
     }
   }
@@ -58,10 +59,10 @@ export async function loadConfig(options: { create?: boolean; defaults?: Partial
   });
   return {
     ...value, dataDir, configPath,
-    profileDir: path.resolve(process.env.BROWSERPILOT_PROFILE_DIR || path.join(dataDir, "profiles", "default")),
-    downloadDir: path.resolve(process.env.BROWSERPILOT_DOWNLOAD_DIR || (value.backend === "extension"
+    profileDir: path.resolve(/* turbopackIgnore: true */ process.env.BROWSERPILOT_PROFILE_DIR || path.join(dataDir, "profiles", "default")),
+    downloadDir: path.resolve(/* turbopackIgnore: true */ process.env.BROWSERPILOT_DOWNLOAD_DIR || (value.backend === "extension"
       ? path.join(os.homedir(), "Downloads", "BrowserPilot") : path.join(dataDir, "downloads"))),
-    uploadDir: path.resolve(process.env.BROWSERPILOT_UPLOAD_DIR || path.join(dataDir, "uploads")),
+    uploadDir: path.resolve(/* turbopackIgnore: true */ process.env.BROWSERPILOT_UPLOAD_DIR || path.join(dataDir, "uploads")),
   };
 }
 

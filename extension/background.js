@@ -1,4 +1,4 @@
-import { sitePattern } from "./policy.js";
+import { checkCommandDeadline, sitePattern } from "./policy.js";
 const attached = new Set();
 const diagnostics = [];
 const network = new Map();
@@ -8,6 +8,14 @@ let selectedTabId;
 let pendingDownload;
 let agentGroupId;
 let agentWindowId;
+let connection = { state: "unpaired", profileId: "default", port: null, pendingCommands: 0, lastConnectedAt: null };
+let reconnectDelay = 2_000;
+let connectingPromise;
+
+function connectionState(state) {
+  connection.state = state;
+  chrome.action.setBadgeText({ text: { unpaired: "PAIR", connecting: "WAIT", connected: "", disconnected: "OFF", rejected: "PAIR" }[state] || "OFF" }).catch(() => undefined);
+}
 
 const groupTitle = "BrowserPilot";
 
@@ -383,56 +391,93 @@ async function historyEntry(tabId, direction) {
   return history.entries[index].id;
 }
 
-async function connect() {
+async function connectOnce() {
   if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) return;
   clearTimeout(reconnectTimer);
   const stored = await chrome.storage.local.get(["profileId", "bridgeToken", "bridgePort"]);
   if (!/^[a-f0-9]{64}$/.test(stored.bridgeToken || "") || !Number.isInteger(stored.bridgePort) || stored.bridgePort < 1024 || stored.bridgePort > 65535) {
-    await chrome.action.setBadgeText({ text: "PAIR" });
+    connection.port = null;
+    connectionState("unpaired");
     return;
   }
   const profileId = /^[a-z][a-z0-9-]{0,31}$/.test(stored.profileId || "") ? stored.profileId : "default";
+  connection.profileId = profileId;
+  connection.port = stored.bridgePort;
+  connectionState("connecting");
   const peer = new WebSocket(`ws://127.0.0.1:${stored.bridgePort}/bridge`);
   socket = peer;
   let commands = Promise.resolve();
+  const handshakeTimer = setTimeout(() => {
+    if (socket === peer && connection.state !== "connected") peer.close();
+  }, 10_000);
   peer.addEventListener("open", () => {
     peer.send(JSON.stringify({ type: "hello", token: stored.bridgeToken, profileId }));
-    chrome.action.setBadgeText({ text: "" });
   });
   peer.addEventListener("message", (event) => {
     let message;
     try { message = JSON.parse(event.data); } catch { return; }
+    if (message?.type === "ready" && message.profileId === profileId && socket === peer) {
+      clearTimeout(handshakeTimer);
+      reconnectDelay = 2_000;
+      connection.lastConnectedAt = Date.now();
+      connectionState("connected");
+      return;
+    }
     if (!Number.isSafeInteger(message.id)) return;
+    connection.pendingCommands++;
     commands = commands.then(async () => {
-      if (socket !== peer || peer.readyState !== WebSocket.OPEN) return;
       try {
+        if (socket !== peer || peer.readyState !== WebSocket.OPEN) return;
+        checkCommandDeadline(message.deadlineAt);
         const result = await handle(message.command, message.args || {});
         if (peer.readyState === WebSocket.OPEN) peer.send(JSON.stringify({ id: message.id, result }));
       } catch (error) {
         if (peer.readyState === WebSocket.OPEN) peer.send(JSON.stringify({ id: message.id, error: error instanceof Error ? error.message : "Browser action failed." }));
+      } finally {
+        connection.pendingCommands = Math.max(0, connection.pendingCommands - 1);
       }
     });
   });
-  peer.addEventListener("close", () => {
+  peer.addEventListener("close", (event) => {
+    clearTimeout(handshakeTimer);
     if (socket !== peer) return;
     socket = undefined;
-    chrome.action.setBadgeText({ text: "OFF" });
-    reconnectTimer = setTimeout(connect, 2_000);
+    connectionState(event.code === 1008 ? "rejected" : "disconnected");
+    if (event.code !== 1008) {
+      reconnectTimer = setTimeout(connect, reconnectDelay);
+      reconnectDelay = Math.min(30_000, reconnectDelay * 2);
+    }
   });
   peer.addEventListener("error", () => peer.close());
 }
 
-chrome.runtime.onMessage.addListener((message) => {
-  if (message?.type !== "reconnect") return;
+async function connect() {
+  if (connectingPromise) return connectingPromise;
+  connectingPromise = connectOnce().finally(() => { connectingPromise = undefined; });
+  return connectingPromise;
+}
+
+async function reconnect() {
+  clearTimeout(reconnectTimer);
+  await connectingPromise;
   socket?.close();
   socket = undefined;
-  connect();
+  reconnectDelay = 2_000;
+  return connect();
+}
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === "connectionStatus") {
+    sendResponse({ ...connection });
+    return;
+  }
+  if (message?.type !== "reconnect") return;
+  reconnect().then(() => sendResponse({ reconnecting: true })).catch(() => sendResponse({ reconnecting: false }));
+  return true;
 });
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local" || !["bridgeToken", "bridgePort", "profileId"].some((key) => key in changes)) return;
-  socket?.close();
-  socket = undefined;
-  connect();
+  reconnect();
 });
 chrome.permissions.onRemoved.addListener(async () => {
   for (const tabId of attached) {

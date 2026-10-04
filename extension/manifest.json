@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BrowserPilot",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "minimum_chrome_version": "116",
   "description": "Connect approved browser tabs to your local AI agent with per-site permissions and local action approvals.",
   "permissions": ["tabs", "tabGroups", "scripting", "debugger", "downloads", "storage", "alarms"],

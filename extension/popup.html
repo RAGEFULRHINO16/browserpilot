@@ -16,12 +16,22 @@
     .secondary { background: #27483d; color: #f3f2e9; font-size: 11px; }
     label { display: block; margin-top: 14px; }
     .status { margin-top: 12px; min-height: 18px; color: #d8c99b; }
+    .connection { padding: 12px; margin: 14px 0; border: 1px solid #45675a; border-radius: 8px; background: #10221e80; }
+    .connection strong { display: block; }
+    .connection p { font-size: 12px; margin-bottom: 0; }
+    .connection[data-state="connected"] { border-color: #86bca0; }
   </style>
 </head>
 <body>
   <h1>BrowserPilot</h1>
   <p>Give your agent access to the websites you choose. Actions run in a dedicated BrowserPilot group.</p>
   <small>Local action approvals protect changes. Complete passwords, passkeys and verification yourself.</small>
+  <section id="connection" class="connection" aria-live="polite">
+    <strong id="connection-title">Checking connection</strong>
+    <p id="connection-help">Your sign-ins stay in this browser. Pairing does not grant access to websites.</p>
+  </section>
+  <button id="reconnect" class="secondary">Reconnect companion</button>
+  <button id="approvals" class="secondary" disabled>Open local action approvals</button>
   <label>Browser profile <input id="profile" maxlength="32" value="default" spellcheck="false"></label>
   <label>Local pairing code <textarea id="pairing" maxlength="300" spellcheck="false" placeholder="JSON from browserpilot pair" autocomplete="off"></textarea></label>
   <button id="save">Save and connect</button>

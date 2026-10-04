@@ -1,5 +1,30 @@
 # Release validation
 
+## Locally observed results for 0.5.0
+
+On Windows 10.0.26200 x64 with Node.js 24.13.0, the public production archive
+was installed in a fresh temporary prefix with `--workspaces=false`. The extracted
+stdio dependency tree contained no Next.js, React, React DOM, mcp-handler or jose.
+The real MCP SDK handshake listed all 50 tools, authenticated file staging and
+reading worked, and the owned companion stopped after client disconnect.
+
+The core suite passed 51 tests with one opt-in Chromium test skipped by default.
+The optional HTTP adapter test passed, and the extension smoke passed in sandboxed
+Chromium 153.0.8010.12. Cross-platform CI must be consulted for the exact release
+commit before publishing.
+
+One local companion sample measured 99.8 MiB RSS and 46.1 MiB JavaScript heap after
+10 seconds idle, with no browser running. Installed dependency bytes were 31.3 MiB
+in that temporary Windows prefix. This excludes the MCP client and browser; it is
+one sample, not a promised ceiling. A real Brave session uses additional memory.
+
+`browserpilot doctor` distinguishes configuration errors, offline services,
+authentication conflicts, backend mismatches, unresponsive ports, a running but
+unpaired browser, human takeover and a healthy connected backend. It never prints
+tokens, never replaces an occupied service, and only recovers a companion process
+owned by the current stdio session. Ambiguous write failures require inspection,
+not blind retries.
+
 ## Locally observed results for 0.4.1
 
 On Windows, the portable build and TypeScript checking passed. The default suite

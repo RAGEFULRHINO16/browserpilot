@@ -59,9 +59,10 @@ const call = async (action, approve = true) => {
 try {
   let ready = false;
   for (let attempt = 0; attempt < 50; attempt++) {
-    try { ready = (await (await fetch(`${base}/health`, { headers: { Authorization: `Bearer ${token}` } })).json()).ready; }
+    try { ready = (await (await fetch(`${base}/health`, { headers: { Authorization: `Bearer ${token}` } })).json()).serviceReady; }
     catch { await new Promise((resolve) => setTimeout(resolve, 200)); }
     if (ready) break;
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
   if (!ready) throw new Error(`Companion did not start. ${logs}`);
 
@@ -293,6 +294,26 @@ try {
     }
   }
   await call({ type: "close_tab", pageId: labelTab.pageId });
+  const popupPage = await context.newPage();
+  const popupLogs = [];
+  popupPage.on("pageerror", (error) => popupLogs.push(error.message));
+  popupPage.on("console", (message) => { if (message.type() === "error") popupLogs.push(message.text()); });
+  await popupPage.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html`);
+  await popupPage.locator("#connection-title").filter({ hasText: "Connected and ready" }).waitFor();
+  if (await popupPage.locator("#approvals").isDisabled()) throw new Error("Connected popup cannot open local approvals.");
+  if ((await popupPage.locator("body").innerText()).includes(bridgeToken) || await popupPage.locator("#pairing").inputValue() !== "") {
+    throw new Error("Popup exposed its saved private pairing credential.");
+  }
+  await popupPage.locator("#reconnect").click();
+  await popupPage.locator("#connection-title").filter({ hasText: "Connected and ready" }).waitFor();
+  if (process.env.BROWSERPILOT_TEST_ARTIFACT_DIR) {
+    await popupPage.screenshot({ path: path.join(process.env.BROWSERPILOT_TEST_ARTIFACT_DIR, "extension-popup.png"), fullPage: true });
+  }
+  await popupPage.locator("#forget").click();
+  await popupPage.locator("#connection-title").filter({ hasText: "Step 1: pair your companion" }).waitFor();
+  if (!await popupPage.locator("#approvals").isDisabled()) throw new Error("Unpaired popup still offers companion approval access.");
+  if (popupLogs.length) throw new Error(`Popup runtime/console errors: ${popupLogs.join("; ")}`);
+  await popupPage.close();
   console.log(`PASS: isolated Chromium extension; group isolation, background focus, vision, semantic interactions, native/ARIA labels, hidden native toggles, sensitive fields, label-bound approvals, screenshots, PDF, uploads/downloads, extraction, profiles, handoff, and website denial.`);
 } finally {
   await browser?.close().catch(() => undefined);

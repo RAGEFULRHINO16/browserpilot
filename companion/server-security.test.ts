@@ -39,6 +39,14 @@ test("real companion blocks rebinding and unapproved innocuous-label mutations",
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     assert.equal(ready, true, "isolated companion became ready");
+    const health = async () => (await (await fetch(`${base}/health`, { headers: { authorization: `Bearer ${token}` } })).json());
+    const offline = await health();
+    assert.equal(offline.serviceReady, true);
+    assert.equal(offline.ready, false, "companion availability does not imply an extension is connected");
+    assert.deepEqual(offline.connectedProfiles, []);
+    assert.equal(offline.queueDepth, 0);
+    assert.ok(offline.memory.rssBytes > 0 && offline.memory.heapUsedBytes > 0);
+    assert.ok(offline.uptimeSeconds > 0);
     const rebinding = await new Promise<{ status: number; text: string }>((resolve, reject) => {
       const outgoing = httpRequest(`${base}/approvals`, { headers: { host: `attacker.example:${port}` } }, (response) => {
         let text = "";
@@ -59,6 +67,8 @@ test("real companion blocks rebinding and unapproved innocuous-label mutations",
     socket.send(JSON.stringify({ type: "hello", profileId: "default",
       token: createHmac("sha256", token).update("browserpilot-brave-extension-v1").digest("hex") }));
     await paired;
+    assert.equal((await health()).ready, true);
+    assert.deepEqual((await health()).connectedProfiles, ["default"]);
     let mutations = 0;
     let pageUrl = "https://example.com/?recipient=1";
     socket.on("message", (raw) => {
@@ -75,6 +85,13 @@ test("real companion blocks rebinding and unapproved innocuous-label mutations",
       assert.equal(response.status, 200);
       return (await response.json()).result;
     };
+    await action({ type: "workflow_start", name: "Bounded recording" });
+    for (let index = 0; index < 101; index++) {
+      const result = await action({ type: "scroll", direction: "down", pixels: 10, pageId: "page-1" });
+      if (index >= 99) assert.match(result.workflowRecordingWarning, /action succeeded/);
+    }
+    assert.equal((await action({ type: "workflow_status" })).recording.steps, 100);
+    assert.equal((await action({ type: "workflow_stop" })).steps, 100);
     const approve = async (id: string) => {
       const page = await (await fetch(`${base}/approvals`)).text();
       const csrf = page.match(/name="csrf" value="([a-f0-9]+)"/)?.[1];
@@ -108,6 +125,11 @@ test("real companion blocks rebinding and unapproved innocuous-label mutations",
     pageUrl = "https://example.com/?recipient=2";
     assert.equal((await action({ ...click, approvalId: destinationApproval.approvalId })).approvalRequired, true);
     assert.equal(mutations, 1, "a changed URL query invalidates the approved action");
+    const disconnected = once(socket, "close");
+    socket.close();
+    await disconnected;
+    assert.equal((await health()).ready, false);
+    assert.equal((await action({ type: "status" })).ready, false, "status remains usable for offline recovery");
   } finally {
     socket?.terminate();
     if (child.exitCode === null && child.signalCode === null) {

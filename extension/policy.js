@@ -21,3 +21,10 @@ export function sitePattern(raw) {
   if (url.hostname === "accounts.google.com") throw new Error("Complete sign-in yourself in your browser.");
   return `${url.protocol}//${url.hostname}/*`;
 }
+
+export function checkCommandDeadline(deadlineAt, now = Date.now()) {
+  if (!Number.isSafeInteger(deadlineAt) || deadlineAt > now + 120_000) {
+    throw new Error("Invalid command deadline. Update the companion and extension together.");
+  }
+  if (deadlineAt <= now) throw new Error("Command expired before execution. No action was started. Take a fresh snapshot before retrying.");
+}

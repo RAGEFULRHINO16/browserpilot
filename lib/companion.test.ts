@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { toolResult } from "./companion";
+import { browserFailure, CompanionError, toolResult } from "./companion";
 
 test("file results use the correct MCP content type", () => {
   const image = toolResult({ id: "image-1", name: "pin.jpg", mimeType: "image/jpeg", data: "YWJj" });
@@ -11,6 +11,21 @@ test("file results use the correct MCP content type", () => {
   assert.deepEqual("resource" in pdf.content[0] ? pdf.content[0].resource : undefined, {
     uri: "browserpilot://file/pdf-1", mimeType: "application/pdf", blob: "YWJj",
   });
+});
+
+test("recovery errors never advise automatic retries for ambiguous browser writes", () => {
+  for (const message of ["Extension disconnected", "Brave extension timed out during interact", "Browser action failed."]) {
+    const error = browserFailure(new Error(message), { type: "interact", action: "click" });
+    assert.equal(error.outcomeUnknown, true);
+    assert.equal(error.retryable, false);
+    assert.ok(error.recovery.some((step) => /inspect/i.test(step)));
+  }
+  const stale = browserFailure(new Error("Page ID is stale. List tabs again."), { type: "click" });
+  assert.equal(stale.code, "STALE_PAGE");
+  assert.equal(stale.outcomeUnknown, false);
+  assert.match(stale.recovery[0], /browser_tabs/);
+  const offline = new CompanionError("Offline", "COMPANION_OFFLINE", ["Start the companion"]);
+  assert.equal(browserFailure(offline, { type: "snapshot" }), offline);
 });
 
 test("visual reading includes page text and an MCP image", () => {

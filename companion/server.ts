@@ -93,6 +93,24 @@ let browser: BrowserController;
 let handedOff = false;
 const activeProfileId = () => extensionMode ? extensionBridge.activeId : profiles.activeId;
 
+function browserReady(): boolean {
+  if (extensionMode) return extensionBridge.connected();
+  try {
+    const context = profiles.context;
+    return context.browser()?.isConnected() ?? context.pages().some((page) => !page.isClosed());
+  } catch { return false; }
+}
+
+function health() {
+  const connectedBraveProfiles = extensionBridge.profiles().map((profile) => profile.id);
+  const ready = browserReady();
+  const memory = process.memoryUsage();
+  return { serviceReady: true, ready, backend: extensionMode ? "extension" : "playwright", profileId: activeProfileId(),
+    connectedProfiles: extensionMode ? connectedBraveProfiles : ready ? [activeProfileId()] : [],
+    connectedBraveProfiles, handedOff, workflows: workflows.health(), queueDepth, uptimeSeconds: process.uptime(),
+    memory: { rssBytes: memory.rss, heapUsedBytes: memory.heapUsed } };
+}
+
 async function ensureBrowserPage(): Promise<void> {
   if (extensionMode) { await browser.ensurePage(); return; }
   try {
@@ -164,6 +182,8 @@ async function run(input: Action): Promise<unknown> {
   switch (input.type) {
     case "status": {
       if (extensionMode) {
+        if (!browserReady()) return { ...health(), pageId: null, url: null, headless: false,
+          recovery: "Open your browser and reconnect the paired BrowserPilot extension." };
         const tabs = await browser.tabs();
         const current = tabs.find((tab) => tab.pageId === browser.activePageId) || tabs.find((tab) => tab.selected) || tabs[0];
         return { ready: true, profileId: activeProfileId(), pageId: current?.pageId || null,
@@ -348,7 +368,9 @@ async function run(input: Action): Promise<unknown> {
         if (result && typeof result === "object" && "approvalRequired" in result) return { ...await workflows.awaitingApproval(), result };
         return { ...await workflows.advance(), result };
       } catch (error) {
-        return { ...await workflows.fail(error instanceof Error ? error.message : "Workflow step failed."), retryRequired: true };
+        const message = error instanceof Error ? error.message : "Workflow step failed.";
+        try { return { ...await workflows.fail(message), retryRequired: true }; }
+        catch { return { ...workflows.status(), retryRequired: true, lastError: message }; }
       }
     }
     case "workflow_cancel": return workflows.cancel();
@@ -392,9 +414,7 @@ const server = createServer(async (request, response) => {
     return response.end(valid ? "" : "Forbidden");
   }
   if (!authorized(request)) return respond(response, 401, { error: "Unauthorized" });
-  if (request.url === "/health" && request.method === "GET") return respond(response, 200, {
-    ready: true, backend: extensionMode ? "extension" : "playwright", connectedBraveProfiles: extensionBridge.profiles().map((profile) => profile.id),
-  });
+  if (request.url === "/health" && request.method === "GET") return respond(response, 200, health());
   if (request.url !== "/action" || request.method !== "POST") return respond(response, 404, { error: "Not found" });
   if (request.headers["content-type"]?.split(";", 1)[0] !== "application/json") return respond(response, 415, { error: "JSON is required." });
   if (queueDepth >= 16) return respond(response, 429, { error: "Browser action queue is full. Retry later." });
@@ -407,7 +427,10 @@ const server = createServer(async (request, response) => {
     await previous;
     try {
       if (response.destroyed) return;
-      respond(response, 200, { result: await run(input) });
+      const result = await run(input);
+      const warning = workflows.recordingWarning();
+      respond(response, 200, { result: warning && result && typeof result === "object" && !Array.isArray(result)
+        ? { ...result, workflowRecordingWarning: warning } : result });
     } finally {
       release();
     }

@@ -15,6 +15,13 @@ For Codex: `codex mcp add browserpilot -- node /absolute/path/browserpilot/dist/
 For Claude Desktop and clients following its config convention, use `mcpServers`
 above. BrowserPilot has not undergone provider certification.
 
+For guided setup, run `browserpilot setup --client claude`,
+`browserpilot setup --client codex`, or `browserpilot setup --client generic`.
+The command prints a configuration example without writing to client files and
+never prints bearer or pairing secrets. `browserpilot doctor --json` returns
+sanitized status suitable for local diagnostics. A running companion with an
+unpaired browser is reused rather than replaced.
+
 ## Optional local streamable HTTP
 
 Set independent `BROWSERPILOT_COMPANION_TOKEN`,
@@ -23,6 +30,7 @@ Set independent `BROWSERPILOT_COMPANION_TOKEN`,
 Run `npm run build:web` then `npm start`. Your client connects to
 `http://127.0.0.1:3000/mcp` with `Authorization: Bearer <MCP token>`.
 Start the companion with matching configuration using `browserpilot start`.
+The MCP token must be at least 32 characters and differ from the companion token.
 Tokens are never included in the URL.
 
 The adapter rejects public Host headers and foreign Origin headers. It has no

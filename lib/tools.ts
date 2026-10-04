@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { callCompanion, toolResult, type BrowserAction } from "./companion";
+import { browserFailure, callCompanion, toolResult, type BrowserAction } from "./companion";
 import { extractSchema, targetSchema, waitSchema } from "../companion/interaction";
 import { downloadChatGptFile } from "./chatgpt-file";
 import { siteSchema } from "../companion/site-adapters";
@@ -14,9 +14,12 @@ export function registerBrowserTools(
     try {
       return toolResult(await execute(action));
     } catch (error) {
+      const failure = browserFailure(error, action);
       return {
         isError: true,
-        content: [{ type: "text" as const, text: error instanceof Error ? error.message : "Browser action failed." }],
+        structuredContent: { error: { code: failure.code, message: failure.message, recovery: failure.recovery,
+          outcomeUnknown: failure.outcomeUnknown, retryable: failure.retryable } },
+        content: [{ type: "text" as const, text: `${failure.message}\n${failure.recovery.join("\n")}` }],
       };
     }
   };
