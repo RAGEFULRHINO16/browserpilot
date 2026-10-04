@@ -1,0 +1,45 @@
+name: First-run or compatibility report
+description: Share an actual install result, successful or unsuccessful. No account data.
+labels: ["compatibility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A failed first run is useful too. This is a voluntary report, not telemetry.
+        Never attach pairing JSON, tokens, private URLs, browser profiles or account screenshots.
+  - type: input
+    id: version
+    attributes:
+      label: BrowserPilot version or commit
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS and architecture, Node version, browser version, backend and MCP client/version (if used).
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Observed result
+      options:
+        - First-run exercise passed
+        - First-run exercise failed
+        - Real MCP client workflow passed
+        - Real MCP client workflow failed
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Command or workflow and sanitized output
+      description: Include exact steps and expected versus actual behavior. Identify skipped checks and any local modifications.
+    validations:
+      required: true
+  - type: textarea
+    id: limitation
+    attributes:
+      label: Remaining friction or limitations
+      description: What nearly prevented you from trying it? What was not exercised?

@@ -1,5 +1,29 @@
 # Release validation
 
+## Locally observed first-run and cleanup regressions for 0.5.2
+
+The no-account `npm run try:browser` exercise passed on Windows x64 with Node
+24.13.0 using sandboxed headless Chromium. The real MCP connection listed 50
+tools, read a public page, extracted links, returned a 47,271-byte JPEG through
+MCP content, and round-tripped a synthetic local text file. No model was called,
+no website write was performed, and the temporary profile was removed after
+companion shutdown. Public page content and image sizes can change.
+
+An initial run exposed a Windows profile-file cleanup race. The CLI now sends
+an owned-process-only IPC shutdown request so the companion can close its
+Playwright context before exit; no HTTP or agent-tool shutdown endpoint was
+added. The termination fallback stays bounded and never targets a reused service.
+New tests exercise asynchronous IPC cleanup and real isolated Chromium MCP
+disconnect/profile removal. All 54 core tests passed with browser checks enabled;
+the existing isolated extension smoke, typecheck and optional HTTP test/build
+also passed. The optional web adapter now resolves Next.js 16.3.8 after review
+of the dependency-only update; this is not a claim about exploitability of every
+upstream advisory in this application.
+
+These remain maintainer-run results, not independent usage or a security audit.
+The public-page exercise is manual; deterministic CI uses synthetic fixtures
+rather than depending on a third-party website's availability or content.
+
 ## Locally observed feedback regressions for 0.5.1
 
 The approval page displays a 12-character SHA-256 request prefix and the full

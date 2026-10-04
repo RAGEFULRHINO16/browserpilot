@@ -1,7 +1,7 @@
 {
   "name": "browserpilot",
   "type": "module",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "workspaces": [
     "web-adapter"
   ],
@@ -51,6 +51,7 @@
     "test:mcp": "tsx --test mcp/*.test.ts",
     "test:http": "npm test --workspace @browserpilot/http-adapter",
     "test:package": "node scripts/package-smoke.mjs",
+    "try:browser": "npm run build && node scripts/try-browser.mjs",
     "audit:release": "node scripts/release-audit.mjs",
     "prepack": "npm run build"
   },

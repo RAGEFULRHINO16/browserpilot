@@ -389,8 +389,10 @@ if (extensionMode) {
 
 let queued = Promise.resolve();
 let queueDepth = 0;
+let shuttingDown = false;
 
 const server = createServer(async (request, response) => {
+  if (shuttingDown) return respond(response, 503, { error: "Companion is shutting down. Inspect the page before retrying any write." });
   if (!localRequestAllowed(request, port)) return respond(response, 403, { error: "Invalid local request origin or host." });
   if (request.url === "/approvals" && request.method === "GET") {
     response.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY",
@@ -445,6 +447,26 @@ server.requestTimeout = 15_000;
 server.headersTimeout = 10_000;
 server.maxConnections = 32;
 extensionBridge.attach(server);
+
+async function shutdown(): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  server.close();
+  server.closeAllConnections();
+  try { if (!extensionMode) await profiles.close(); }
+  catch { process.exitCode = 1; }
+  finally { process.exit(process.exitCode || 0); }
+}
+
+process.once("SIGINT", () => { void shutdown(); });
+process.once("SIGTERM", () => { void shutdown(); });
+if (process.send) {
+  // No HTTP/tool shutdown endpoint: only the process-owning CLI has this channel.
+  process.on("message", (message) => {
+    if (message && typeof message === "object" && "type" in message && message.type === "browserpilot-shutdown") void shutdown();
+  });
+  process.once("disconnect", () => { void shutdown(); });
+}
 server.listen(port, host, () => {
   process.stdout.write(`BrowserPilot companion listening on http://${host}:${port}\n`);
   process.stdout.write(extensionMode ? "Browser backend: daily Brave extension\n" : `Browser profile: ${profileDir}\n`);

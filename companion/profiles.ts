@@ -55,6 +55,12 @@ export class BrowserProfiles {
     return this.select(id);
   }
 
+  async close(): Promise<void> {
+    const context = this.activeContext;
+    this.activeContext = undefined;
+    await context?.close();
+  }
+
   async list() {
     await mkdir(this.root, { recursive: true });
     const entries = await readdir(this.root, { withFileTypes: true });

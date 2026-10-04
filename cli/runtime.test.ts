@@ -5,7 +5,7 @@ import { createServer, type ServerResponse } from "node:http";
 import { once } from "node:events";
 import test from "node:test";
 import type { BrowserPilotConfig } from "../companion/config";
-import { ensureCompanion, inspectCompanion, ManagedCompanion } from "./runtime";
+import { ensureCompanion, inspectCompanion, ManagedCompanion, stopOwnedCompanion } from "./runtime";
 
 function config(port: number): BrowserPilotConfig {
   return { companionPort: port, token: randomBytes(48).toString("base64url"), backend: "extension", headless: false,
@@ -96,6 +96,27 @@ test("startup timeout terminates only the child launched for that attempt", asyn
     assert.equal(unrelated.exitCode, null);
     assert.equal(unrelated.signalCode, null);
   } finally { unrelated.kill(); await once(unrelated, "exit"); }
+});
+
+test("owned IPC shutdown lets the child finish asynchronous resource cleanup", { timeout: 10_000 }, async () => {
+  const child = spawn(process.execPath, ["-e", `
+    process.on('message', async (message) => {
+      if (message.type !== 'browserpilot-shutdown') return;
+      await new Promise(resolve => setTimeout(resolve, 100));
+      process.stdout.write('resource-closed');
+      process.exit(0);
+    });
+    process.send({ready:true});
+  `], { stdio: ["ignore", "pipe", "pipe", "ipc"], windowsHide: true });
+  let output = "";
+  child.stdout!.on("data", (chunk) => { output += String(chunk); });
+  try {
+    await once(child, "message");
+    await stopOwnedCompanion(child);
+    assert.equal(child.exitCode, 0);
+    assert.equal(child.signalCode, null);
+    assert.equal(output, "resource-closed");
+  } finally { await stopOwnedCompanion(child); }
 });
 
 test("managed recovery starts once after an owned crash and closes its replacement", async () => {

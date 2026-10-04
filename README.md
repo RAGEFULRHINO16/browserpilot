@@ -16,7 +16,7 @@ The extension starts with public websites **unapproved**. You grant websites
 from its popup, and actions such as clicks, typing, selection, upload and download
 triggers require a one-use approval on your PC. Read the [security boundaries](SECURITY.md)
 before connecting a profile with sensitive accounts. This is an early public
- release with AI-assisted development, not an independently audited security product.
+release with AI-assisted development, not an independently audited security product.
 
 The current release adds a read-only `browserpilot doctor` command, bounded startup
 and owned-process recovery, truthful browser-connected status, extension reconnect
@@ -27,6 +27,27 @@ connections are not migrated automatically.
 The [latest release](https://github.com/RAGEFULRHINO16/browserpilot/releases/latest)
 includes a compiled npm-format archive and SHA-256 checksum. It is not published
 to the npm registry; the source instructions below remain the reproducible path.
+
+## Try it without an account or model API key
+
+After cloning this repository, run:
+
+```sh
+npm ci --workspaces=false
+npx playwright install chromium
+npm run try:browser
+```
+
+This builds the CLI and exercises a real MCP connection against `https://example.com`
+in temporary, sandboxed headless Chromium: page reading, link extraction, image
+content and a synthetic local file round-trip. It makes no website writes, never
+uses your daily browser profile, and removes its temporary state after verified
+shutdown. The browser download uses disk space; Node 22+ and working internet are
+required. Linux may require Chromium system libraries. No language model is called.
+This verifies the local engine, not a particular agent client's behavior.
+
+Successful and failed runs are both useful: [report your actual environment and result](https://github.com/RAGEFULRHINO16/browserpilot/issues/new?template=compatibility.yml).
+Please remove credentials, private URLs and account data from reports.
 
 ## What it does
 

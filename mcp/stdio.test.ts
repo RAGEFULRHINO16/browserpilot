@@ -61,3 +61,35 @@ test("real MCP stdio handshake lists all tools and invokes the isolated authenti
   }
   await assert.rejects(fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(1000) }));
 });
+
+test("isolated Playwright MCP disconnect closes Chromium and releases its profile", {
+  timeout: 45_000, skip: process.env.BROWSERPILOT_BROWSER_SECURITY_TEST !== "1",
+}, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "browserpilot-browser-cleanup-"));
+  const port = await unusedPort();
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key, value]) =>
+    value !== undefined && !key.toUpperCase().startsWith("BROWSERPILOT_"))) as Record<string, string>;
+  Object.assign(env, { BROWSERPILOT_DATA_DIR: root,
+    BROWSERPILOT_CONFIG_PATH: path.join(root, "config.json"),
+    BROWSERPILOT_COMPANION_TOKEN: randomBytes(48).toString("base64url"),
+    BROWSERPILOT_COMPANION_PORT: String(port), BROWSERPILOT_BROWSER_BACKEND: "playwright",
+    BROWSERPILOT_HEADLESS: "1", BROWSERPILOT_PROFILE_DIR: path.join(root, "profile"),
+    BROWSERPILOT_DOWNLOAD_DIR: path.join(root, "downloads"), BROWSERPILOT_UPLOAD_DIR: path.join(root, "uploads") });
+  const transport = new StdioClientTransport({ command: process.execPath,
+    args: [path.resolve("dist/cli/index.js"), "mcp"], env, stderr: "pipe" });
+  const client = new Client({ name: "browserpilot-browser-cleanup", version: "1.0.0" });
+  try {
+    await client.connect(transport);
+    const status = await client.callTool({ name: "browser_status", arguments: {} });
+    assert.equal(status.isError, undefined);
+    assert.equal((status.structuredContent as { result: { ready: boolean } }).result.ready, true);
+    const screenshot = await client.callTool({ name: "browser_screenshot", arguments: {} });
+    assert.equal(screenshot.isError, undefined);
+    assert.ok(screenshot.content.some((item) => item.type === "image"));
+  } finally {
+    await client.close();
+    await transport.close();
+    await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+  }
+  await assert.rejects(fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(1000) }));
+});

@@ -112,7 +112,7 @@ export async function companionHealth(config: BrowserPilotConfig): Promise<Compa
 }
 
 export function spawnCompanion(entrypoint: string): ChildProcess {
-  const child = spawn(process.execPath, [entrypoint], { env: process.env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  const child = spawn(process.execPath, [entrypoint], { env: process.env, stdio: ["ignore", "pipe", "pipe", "ipc"], windowsHide: true });
   child.stdout?.pipe(process.stderr);
   child.stderr?.pipe(process.stderr);
   return child;
@@ -156,9 +156,13 @@ export async function ensureCompanion(config: BrowserPilotConfig, entrypoint: st
 export async function stopOwnedCompanion(child: ChildProcess | undefined): Promise<void> {
   if (!child || child.exitCode !== null || child.signalCode !== null) return;
   await new Promise<void>((resolve) => {
-    const timer = setTimeout(() => { child.kill("SIGKILL"); resolve(); }, 3000);
+    const timer = setTimeout(() => { child.kill("SIGKILL"); resolve(); }, 5000);
     child.once("exit", () => { clearTimeout(timer); resolve(); });
-    child.kill("SIGTERM");
+    // Windows kill(SIGTERM) is forceful; parent-only IPC allows profile closure first.
+    if (child.connected) {
+      try { child.send({ type: "browserpilot-shutdown" }, (error) => { if (error) child.kill("SIGTERM"); }); }
+      catch { child.kill("SIGTERM"); }
+    } else child.kill("SIGTERM");
   });
 }
 

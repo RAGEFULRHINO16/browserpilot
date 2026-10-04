@@ -4,6 +4,11 @@ Start with a reproducible issue or a small, focused pull request. Include the
 browser/OS, Node version, backend, tool request (without credentials) and expected
 behavior. Please do not include real account data in fixtures.
 
+For a first contribution, follow the README's `npm run try:browser` exercise and
+submit a first-run/compatibility report. Both failures and successes are useful;
+state exactly what you ran, and never describe maintainer tests as outside usage.
+No stars, favorable reviews, or account access are required to contribute.
+
 ```sh
 npm ci
 npm run build
@@ -30,3 +35,13 @@ reports without a reproduction and sweeping unreviewable changes are not useful.
 
 Use existing naming, strict TypeScript and bounded inputs. Every additional
 write-capable interaction must preserve local approval and profile/tab checks.
+
+## Maintenance and review
+
+Dependency PRs are reviewed for runtime compatibility, lockfile changes and
+applicable upstream advisories; a green bot check alone is not an approval.
+Node declarations stay aligned with the minimum supported runtime. Major SDK,
+build-tool and CI-action upgrades require explicit compatibility review.
+Do not add telemetry, hosted services, or provider billing to a smoke check.
+There is no promised response-time SLA; reproducible regressions and private
+security reports take priority over feature volume.
