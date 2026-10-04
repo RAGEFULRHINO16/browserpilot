@@ -6,12 +6,12 @@ import { applyConfigEnvironment, loadConfig } from "../companion/config";
 import { createBrowserPilotServer } from "../mcp/server";
 import { companionHealth, ensureCompanion, spawnCompanion, stopOwnedCompanion } from "./runtime";
 
-const help = `BrowserPilot 0.4.0\n\nCommands:\n  init [--port 8765] [--backend extension|playwright] [--headless] [--browser-path PATH]\n  pair       Print local extension pairing JSON (keep private)\n  start      Run the companion in the foreground\n  status     Check the configured local companion\n  mcp        Serve standard MCP over stdio; starts the companion if needed\n\nEnvironment: BROWSERPILOT_DATA_DIR, BROWSERPILOT_CONFIG_PATH.\nPlaywright backend: install Chromium once with npx playwright install chromium.\n`;
+const help = `BrowserPilot 0.4.1\n\nCommands:\n  init [--port 8765] [--backend extension|playwright] [--headless] [--browser-path PATH]\n  pair       Print local extension pairing JSON (keep private)\n  start      Run the companion in the foreground\n  status     Check the configured local companion\n  mcp        Serve standard MCP over stdio; starts the companion if needed\n\nEnvironment: BROWSERPILOT_DATA_DIR, BROWSERPILOT_CONFIG_PATH.\nPlaywright backend: install Chromium once with npx playwright install chromium.\n`;
 
 async function main(): Promise<void> {
   const [command = "help", ...args] = process.argv.slice(2);
   if (["help", "--help", "-h"].includes(command)) { process.stdout.write(help); return; }
-  if (["--version", "version"].includes(command)) { process.stdout.write("0.4.0\n"); return; }
+  if (["--version", "version"].includes(command)) { process.stdout.write("0.4.1\n"); return; }
   const option = (name: string) => {
     const index = args.indexOf(name);
     if (index < 0) return undefined;

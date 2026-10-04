@@ -1,17 +1,41 @@
 {
   "name": "browserpilot",
   "type": "module",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Local browser control for MCP agents with session-aware Chromium extension and Playwright backends.",
   "license": "MIT",
   "author": "Magarish Muhunthan",
-  "repository": { "type": "git", "url": "git+https://github.com/RAGEFULRHINO16/browserpilot.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RAGEFULRHINO16/browserpilot.git"
+  },
   "homepage": "https://github.com/RAGEFULRHINO16/browserpilot#readme",
-  "bugs": { "url": "https://github.com/RAGEFULRHINO16/browserpilot/issues" },
-  "engines": { "node": ">=22" },
-  "bin": { "browserpilot": "dist/cli/index.js" },
-  "files": ["dist", "extension", "docs", "README.md", "LICENSE", "SECURITY.md", "NOTICE"],
-  "keywords": ["mcp", "browser", "automation", "agents", "local-first", "playwright"],
+  "bugs": {
+    "url": "https://github.com/RAGEFULRHINO16/browserpilot/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "browserpilot": "dist/cli/index.js"
+  },
+  "files": [
+    "dist",
+    "extension",
+    "docs",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "NOTICE"
+  ],
+  "keywords": [
+    "mcp",
+    "browser",
+    "automation",
+    "agents",
+    "local-first",
+    "playwright"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "node scripts/build.mjs",

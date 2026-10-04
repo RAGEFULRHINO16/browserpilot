@@ -3,13 +3,30 @@
   globalThis.__browserPilotContentReady = true;
 
   const controlSelector = "a[href], button, input, textarea, select, [role='button'], [role='link']";
-  const labelOf = (element) => (
-    element.getAttribute("aria-label") ||
-    element.labels?.[0]?.textContent ||
-    element.innerText ||
-    element.placeholder ||
-    element.getAttribute("title") || ""
-  ).trim();
+  const normalizeText = (value) => (value || "").replace(/\s+/g, " ").trim();
+  const referencedLabelTexts = (element) => (element.getAttribute("aria-labelledby") || "").trim().split(/\s+/)
+    .filter(Boolean).map((id) => normalizeText(document.getElementById(id)?.textContent)).filter(Boolean);
+  const nativeLabelTexts = (element) => Array.from(element.labels || []).map((label) => normalizeText(label.textContent)).filter(Boolean);
+  const labelTexts = (element) => {
+    const referenced = referencedLabelTexts(element);
+    if (referenced.length) return [referenced.join(" ")];
+    const explicit = normalizeText(element.getAttribute("aria-label"));
+    if (explicit) return [explicit];
+    const native = nativeLabelTexts(element);
+    return [...new Set([...native, native.join(" ")].filter(Boolean))];
+  };
+  const labelOf = (element) => labelTexts(element).at(-1) || normalizeText(
+    element.innerText || element.placeholder || element.getAttribute("title") || ""
+  );
+  const labelTarget = (element) => {
+    const tag = element.tagName.toLowerCase();
+    if (tag === "input") return element.type !== "hidden";
+    if (["button", "textarea", "select", "meter", "output", "progress"].includes(tag) || element.isContentEditable) return true;
+    const role = (element.getAttribute("role") || "").trim().split(/\s+/)[0];
+    return ["button", "checkbox", "combobox", "link", "listbox", "menuitem", "menuitemcheckbox", "menuitemradio",
+      "option", "radio", "searchbox", "slider", "spinbutton", "switch", "textbox"].includes(role) ||
+      (tag === "a" && element.hasAttribute("href"));
+  };
   const cleanUrl = (raw) => {
     try {
       const url = new URL(raw, location.href);
@@ -41,7 +58,7 @@
     const compare = (value) => input.exact ? value === needle : value.toLowerCase().includes((needle || "").toLowerCase());
     let found = elements.filter((element) => {
       if (input.by === "role") return implicitRole(element) === input.role && (!needle || compare(labelOf(element)));
-      if (input.by === "label") return compare(labelOf(element));
+      if (input.by === "label") return labelTarget(element) && labelTexts(element).some(compare);
       if (input.by === "placeholder") return compare(element.getAttribute("placeholder") || "");
       return compare((element.innerText || "").trim().slice(0, 500));
     });
@@ -63,27 +80,49 @@
     fingerprint: JSON.stringify({ tag: element.tagName.toLowerCase(), type: element.getAttribute("type"),
       id: element.id, name: element.getAttribute("name"), role: element.getAttribute("role"),
       formActionOverride: element.getAttribute("formaction"), formMethodOverride: element.getAttribute("formmethod"),
+      formAssociation: element.getAttribute("form"), formOwnerId: element.form?.id,
       href: element instanceof HTMLAnchorElement ? element.href : null,
       formAction: (element.form || element.closest("form"))?.action, formMethod: (element.form || element.closest("form"))?.method,
-      contentEditable: element.isContentEditable, label: labelOf(element).slice(0, 160) }),
+      contentEditable: element.isContentEditable, label: labelOf(element),
+      ariaLabel: element.getAttribute("aria-label"), labelledBy: element.getAttribute("aria-labelledby"),
+      referencedLabels: referencedLabelTexts(element), nativeLabels: nativeLabelTexts(element) }),
   });
   const sensitive = (element) => {
     const identity = ["type", "name", "id", "autocomplete", "aria-label", "placeholder"].map((key) => element.getAttribute(key) || "").join(" ") +
-      ` ${element.labels?.[0]?.textContent || ""}`;
-    if (/password|passcode|one.time.code|otp|verification.code|credit.card|cc.number|cvv|cvc/i.test(identity)) {
+      ` ${nativeLabelTexts(element).join(" ")} ${referencedLabelTexts(element).join(" ")}`;
+    if (/password|passcode|one[-.\s]*time[-.\s]*(?:code|password)|otp|(?:verification|security|authentication|recovery|backup)[-.\s]*code|credit[-.\s]*card|\bcc-[a-z-]+\b|cc.number|cvv|cvc/i.test(identity)) {
       throw new Error("Complete sensitive sign-in and payment fields directly in Brave.");
     }
   };
-  const point = (element) => {
+  const visiblePoint = (element) => {
     element.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
     const rect = element.getBoundingClientRect();
-    if (!rect.width || !rect.height) throw new Error("Target is not visible.");
+    const style = getComputedStyle(element);
+    if (!rect.width || !rect.height || style.visibility === "hidden" || style.visibility === "collapse" || Number(style.opacity) === 0) {
+      throw new Error("Target is not visible.");
+    }
     const x = rect.left + rect.width / 2;
     const y = rect.top + rect.height / 2;
     const top = document.elementFromPoint(x, y);
     if (!top || (top !== element && !element.contains(top))) throw new Error("Target is obscured. Take a fresh snapshot before interacting.");
     return { x, y,
       rect: { x: rect.left, y: rect.top, width: rect.width, height: rect.height } };
+  };
+  const point = (element) => {
+    if (element instanceof HTMLInputElement && ["checkbox", "radio"].includes(element.type)) {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      const hidden = !rect.width || !rect.height || style.visibility === "hidden" || style.visibility === "collapse" ||
+        Number(style.opacity) === 0 || style.clip !== "auto" || style.clipPath !== "none";
+      if (hidden) {
+        for (const label of Array.from(element.labels || [])) {
+          if (label.control !== element) continue;
+          try { return visiblePoint(label); } catch { /* Try only another associated visible label. */ }
+        }
+        throw new Error("Hidden checkbox or radio has no visible associated label.");
+      }
+    }
+    return visiblePoint(element);
   };
   const snapshot = () => ({
     url: cleanUrl(location.href) || location.href,

@@ -58,6 +58,35 @@ function displayUrl(raw: string): string {
   }
 }
 
+// This callback is serialized into the browser; keep its helpers self-contained.
+export function browserElementIdentity(element: Element | null) {
+  if (!element) return { label: "", tag: "", type: undefined, href: undefined, fingerprint: "", sensitive: false, inForm: false };
+  const root = element.getRootNode() as Document | ShadowRoot;
+  const referenced = (element.getAttribute("aria-labelledby") || "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean).map((id) => ({
+    id, text: ((root.getElementById?.(id) || element.ownerDocument.getElementById(id))?.textContent || "").replace(/\s+/g, " ").trim(),
+  }));
+  const native = Array.from((element as HTMLInputElement).labels || []).map((label) => ({
+    id: label.id, htmlFor: label.htmlFor, text: (label.textContent || "").replace(/\s+/g, " ").trim(),
+  }));
+  const ariaLabel = (element.getAttribute("aria-label") || "").replace(/\s+/g, " ").trim();
+  const referencedName = referenced.map((label) => label.text).filter(Boolean).join(" ");
+  const nativeName = native.map((label) => label.text).filter(Boolean).join(" ");
+  const tag = element.tagName.toLowerCase();
+  const label = referencedName || ariaLabel || nativeName || (tag !== "body" && tag !== "html"
+    ? ((element as HTMLElement).innerText || (element as HTMLInputElement).placeholder || element.getAttribute("title") || "").replace(/\s+/g, " ").trim() : "");
+  const form = (element as HTMLInputElement).form || element.closest("form");
+  const type = tag === "input" || tag === "button" ? (element as HTMLInputElement).type : element.getAttribute("type") || undefined;
+  const href = tag === "a" && element.hasAttribute("href") ? new URL((element as HTMLAnchorElement).href) : undefined;
+  const attributes = ["id", "name", "type", "role", "form", "formaction", "formmethod", "contenteditable", "autocomplete", "placeholder"]
+    .map((name) => element.getAttribute(name) || "");
+  const identity = [...attributes, ariaLabel, referencedName, nativeName].join(" ");
+  const sensitive = /password|passcode|one[-.\s]*time[-.\s]*(?:code|password)|otp|(?:verification|security|authentication|recovery|backup)[-.\s]*code|credit[-.\s]*card|\bcc-[a-z-]+\b|cc.number|cvv|cvc/i.test(identity);
+  return { label: label.slice(0, 160), tag, type, href: href ? `${href.origin}${href.pathname}` : undefined,
+    fingerprint: JSON.stringify({ tag, attributes, type, label, ariaLabel, labelledBy: element.getAttribute("aria-labelledby"),
+      referenced, native, href: href?.href || "", form: form ? [form.id, form.action, form.method] : null }),
+    sensitive, inForm: !!form };
+}
+
 export class BrowserInteractions implements BrowserController {
   private readonly pages = new Map<string, Page>();
   private readonly diagnosticsLog: Diagnostic[] = [];
@@ -129,14 +158,16 @@ export class BrowserInteractions implements BrowserController {
   }
 
   async focusedDescription(pageId?: string): Promise<{ label: string; tag: string; type: string; fingerprint: string }> {
-    return this.page(pageId).evaluate(() => {
-      const element = document.activeElement;
-      const form = element?.closest("form");
-      return { label: element?.getAttribute("aria-label") || element?.textContent?.trim().slice(0, 120) || "",
-        tag: form ? "form" : element?.tagName.toLowerCase() || "", type: element?.getAttribute("type") || "",
-        fingerprint: JSON.stringify({ tag: element?.tagName, attrs: ["id", "name", "type", "role", "formaction", "formmethod"].map((name) => element?.getAttribute(name) || ""),
-          form: form ? [form.action, form.method, form.id] : null }) };
+    const active = await this.page(pageId).evaluateHandle(() => {
+      let element = document.activeElement;
+      while (element?.shadowRoot?.activeElement) element = element.shadowRoot.activeElement;
+      return element;
     });
+    try {
+      const description = await active.evaluate(browserElementIdentity);
+      return { label: description.label.slice(0, 120), tag: description.inForm ? "form" : description.tag,
+        type: description.type || "", fingerprint: description.fingerprint };
+    } finally { await active.dispose(); }
   }
 
   async press(key: string, pageId?: string): Promise<unknown> {
@@ -212,15 +243,8 @@ export class BrowserInteractions implements BrowserController {
   }
 
   async describeTarget(input: Target, pageId?: string) {
-    return (await this.target(this.page(pageId), input)).evaluate((element) => {
-      const input = element instanceof HTMLInputElement ? element : null;
-      const label = element.getAttribute("aria-label") || input?.labels?.[0]?.textContent || (element as HTMLElement).innerText || input?.placeholder || element.getAttribute("title") || "";
-      const href = element instanceof HTMLAnchorElement ? new URL(element.href) : null;
-      const form = element.closest("form");
-      return { label: label.trim().slice(0, 160), tag: element.tagName.toLowerCase(), type: input?.type || (element instanceof HTMLButtonElement ? element.type : undefined), href: href ? `${href.origin}${href.pathname}` : undefined,
-        fingerprint: JSON.stringify({ tag: element.tagName, attrs: ["id", "name", "type", "role", "formaction", "formmethod", "contenteditable"].map((name) => element.getAttribute(name) || ""),
-          href: href?.href || "", form: form ? [form.action, form.method, form.id] : null }) };
-    });
+    const { sensitive, inForm, ...description } = await (await this.target(this.page(pageId), input)).evaluate(browserElementIdentity);
+    return description;
   }
 
   async download(input: Target, pageId?: string): Promise<Download> {
@@ -290,17 +314,7 @@ export class BrowserInteractions implements BrowserController {
   }
 
   private async guardSensitive(locator: Locator): Promise<void> {
-    const details = await locator.evaluate((element) => ({
-      tag: element.tagName.toLowerCase(),
-      type: element.getAttribute("type"),
-      name: element.getAttribute("name"),
-      id: element.id,
-      autocomplete: element.getAttribute("autocomplete"),
-      label: element.getAttribute("aria-label"),
-      contentEditable: element.getAttribute("contenteditable"),
-    }));
-    const identity = Object.values(details).join(" ");
-    if (/password|passcode|one.time.code|otp|verification.code|credit.card|cc.number|cvv|cvc/i.test(identity)) {
+    if ((await locator.evaluate(browserElementIdentity)).sensitive) {
       throw new Error("Complete sensitive sign-in and payment fields directly in the browser.");
     }
   }

@@ -214,7 +214,86 @@ try {
   try { await call({ type: "open", url: "http://127.0.0.1:8080" }); }
   catch (error) { denied = /only public http/i.test(error.message); }
   if (!denied) throw new Error("Private-network destination was not blocked.");
-  console.log(`PASS: isolated Chromium extension; group isolation, background focus, vision, semantic interactions, approvals, screenshots, PDF, uploads/downloads, extraction, profiles, handoff, and website denial.`);
+  const beforeLabels = new Set(context.pages());
+  const labelTab = await call({ type: "new_tab" });
+  await call({ type: "open", url: "https://example.com", pageId: labelTab.pageId });
+  const labelPage = context.pages().find((candidate) => !beforeLabels.has(candidate));
+  if (!labelPage) throw new Error("Independent semantic-label fixture tab was not found.");
+  await labelPage.setContent(`<!doctype html><title>BrowserPilot semantic labels</title>
+    <section aria-label="Organization ID"><div><article><p>Organization ID</p>
+      <label for="org-id">Organization ID</label><input id="org-id">
+    </article></div></section>
+    <label for="multi-label">Client ID</label><label for="multi-label">Workspace</label><input id="multi-label">
+    <span id="aria-first">Primary</span><span id="aria-second">Contact</span>
+    <input id="aria-input" aria-labelledby="aria-first aria-second" aria-label="Ignored accessible label">
+    <span id="editable-label">Project notes</span><div id="editable-input" role="textbox" contenteditable="true" aria-labelledby="editable-label"></div>
+    <div id="ordinary-draft" contenteditable="true">Documentation about password policies</div>
+    <input type="hidden" aria-label="Hidden field">
+    <label for="hidden-checkbox" style="display:block;padding:12px">Checkbox consent</label>
+    <input id="hidden-checkbox" type="checkbox" style="display:none">
+    <label for="hidden-radio" style="display:block;padding:12px">Radio choice</label>
+    <input id="hidden-radio" name="plan" type="radio" style="opacity:0;position:absolute;width:1px;height:1px">
+    <span id="verification-label">Verification code</span><input id="verification-input" aria-labelledby="verification-label">
+    <label for="secondary-sensitive">Account value</label><label for="secondary-sensitive">CVV</label><input id="secondary-sensitive">
+    <input id="credit-expiry" aria-label="Expiry" autocomplete="cc-exp">
+    <label for="native-bound">Display name</label><label id="native-tail" for="native-bound">${"Ordinary context ".repeat(20)}one</label><input id="native-bound">
+    <span id="association-first">Bound target</span><span id="association-second">Bound target</span>
+    <input id="aria-bound" aria-labelledby="association-first">`);
+  const labelFind = (value, exact = true) => call({ type: "find", pageId: labelTab.pageId, target: { by: "label", value, exact } });
+  const organization = await labelFind("Organization ID", false);
+  if (organization.count !== 1 || organization.matches[0].tag !== "input") {
+    throw new Error(`Label targeting matched ancestors or text instead of the control: ${JSON.stringify(organization)}`);
+  }
+  for (const value of ["Client ID", "Workspace", "Client ID Workspace", "Primary Contact", "Project notes"]) {
+    if ((await labelFind(value)).count !== 1) throw new Error(`Associated label targeting failed: ${value}`);
+  }
+  for (const value of ["Ignored accessible label", "Primary", "Hidden field"]) {
+    if ((await labelFind(value)).count !== 0) throw new Error(`Label matching ignored accessibility precedence or native hidden state: ${value}`);
+  }
+  await call({ type: "interact", pageId: labelTab.pageId, action: "fill", target: { by: "label", value: "Organization ID", exact: true }, text: "org-42" });
+  if (await labelPage.locator("#org-id").inputValue() !== "org-42") throw new Error("Unambiguous label fill failed.");
+  await call({ type: "interact", pageId: labelTab.pageId, action: "fill", target: { by: "label", value: "Project notes", exact: true }, text: "notes" });
+  if (await labelPage.locator("#editable-input").innerText() !== "notes") throw new Error("ARIA-labelled editable control fill failed.");
+  await call({ type: "interact", pageId: labelTab.pageId, action: "fill", target: { by: "css", value: "#ordinary-draft" }, text: "ordinary revised draft" });
+  if (await labelPage.locator("#ordinary-draft").innerText() !== "ordinary revised draft") throw new Error("Ordinary draft text was mistaken for a sensitive field.");
+  for (const [label, selector] of [["Checkbox consent", "#hidden-checkbox"], ["Radio choice", "#hidden-radio"]]) {
+    const located = await labelFind(label);
+    if (located.count !== 1 || located.matches[0].tag !== "input") throw new Error(`Hidden native toggle label did not resolve to its input: ${label}`);
+    await call({ type: "interact", pageId: labelTab.pageId, action: "click", target: { by: "label", value: label, exact: true } });
+    if (!await labelPage.locator(selector).isChecked()) throw new Error(`Associated visible label did not toggle the hidden native input: ${label}`);
+  }
+  for (const selector of ["#verification-input", "#secondary-sensitive", "#credit-expiry"]) {
+    let sensitiveDenied = false;
+    try { await call({ type: "interact", pageId: labelTab.pageId, action: "fill", target: { by: "css", value: selector }, text: "do-not-write" }); }
+    catch (error) { sensitiveDenied = /sensitive sign.in and payment fields/i.test(error.message); }
+    if (!sensitiveDenied || await labelPage.locator(selector).inputValue() !== "") {
+      throw new Error(`Sensitive referenced/native/autocomplete field was writable: ${selector}`);
+    }
+  }
+  const approveLabelAction = async (pending) => {
+    const html = await (await fetch(`${base}/approvals`)).text();
+    const csrf = html.match(/name="csrf" value="([a-f0-9]+)"/)?.[1];
+    if (!pending.approvalRequired || !csrf) throw new Error("Label fingerprint fixture did not require local approval.");
+    const response = await fetch(`${base}/approvals/${pending.approvalId}`, { method: "POST", redirect: "manual",
+      headers: { Origin: base, "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ csrf }) });
+    if (response.status !== 303) throw new Error("Label fingerprint approval fixture failed.");
+  };
+  for (const selector of ["#native-bound", "#aria-bound"]) {
+    const action = { type: "interact", pageId: labelTab.pageId, action: "fill", target: { by: "css", value: selector }, text: "must-remain-empty" };
+    const pending = await rawCall(action);
+    await approveLabelAction(pending);
+    if (selector === "#native-bound") {
+      await labelPage.locator("#native-tail").evaluate((label) => { label.textContent = label.textContent.replace(/one$/, "two"); });
+    } else {
+      await labelPage.locator(selector).evaluate((input) => { input.setAttribute("aria-labelledby", "association-second"); });
+    }
+    const changed = await rawCall({ ...action, approvalId: pending.approvalId });
+    if (!changed.approvalRequired || await labelPage.locator(selector).inputValue() !== "") {
+      throw new Error(`Changed full label or association reused an old approval: ${selector}`);
+    }
+  }
+  await call({ type: "close_tab", pageId: labelTab.pageId });
+  console.log(`PASS: isolated Chromium extension; group isolation, background focus, vision, semantic interactions, native/ARIA labels, hidden native toggles, sensitive fields, label-bound approvals, screenshots, PDF, uploads/downloads, extraction, profiles, handoff, and website denial.`);
 } finally {
   await browser?.close().catch(() => undefined);
   companion.kill();

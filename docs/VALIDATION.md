@@ -1,5 +1,24 @@
 # Release validation
 
+## Locally observed results for 0.4.1
+
+On Windows, the portable build and TypeScript checking passed. The default suite
+passed 30 tests with one explicitly opt-in Chromium security test skipped. With
+`BROWSERPILOT_BROWSER_SECURITY_TEST=1`, all 31 tests passed with no skips.
+The production dependency advisory scan reported zero vulnerabilities.
+
+The isolated, sandbox-enabled Chromium extension smoke also passed. New fixtures
+exercise native and ordered ARIA labels, exclusion of ancestor text from label
+targeting, associated visible-label clicks for hidden native checkboxes/radios,
+sensitive-field rejection, ordinary editable drafts, and approval invalidation
+when complete label text or label associations change. The Playwright fixture
+also checks external form ownership and focused-element fingerprints.
+
+These are focused regressions, not a claim of complete accessible-name algorithm
+coverage or arbitrary website compatibility. The Windows browser CI job enables
+the opt-in security test as well as the extension smoke; the other core jobs
+retain the browser-free default suite.
+
 ## Locally observed results for 0.4.0
 
 On Windows with Node.js 24.13.0:

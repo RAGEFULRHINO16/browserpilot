@@ -18,6 +18,10 @@ triggers require a one-use approval on your PC. Read the [security boundaries](S
 before connecting a profile with sensitive accounts. This is an early public
 release with AI-assisted development, not an independently audited security product.
 
+The [latest release](https://github.com/RAGEFULRHINO16/browserpilot/releases/latest)
+includes a compiled npm-format archive and SHA-256 checksum. It is not published
+to the npm registry; the source instructions below remain the reproducible path.
+
 ## What it does
 
 | Capability | Controls |
