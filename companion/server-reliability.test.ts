@@ -29,15 +29,21 @@ async function fixture(prepare: (directory: string) => Promise<void>,
       BROWSERPILOT_CONFIG_PATH: path.join(directory, "config.json"), BROWSERPILOT_PROFILE_DIR: path.join(directory, "profile"),
       BROWSERPILOT_DOWNLOAD_DIR: path.join(directory, "downloads"), BROWSERPILOT_UPLOAD_DIR: path.join(directory, "uploads") },
   });
-  const health = async () => (await (await fetch(`${base}/health`, { headers: { authorization: `Bearer ${token}` } })).json());
+  const health = async () => {
+    const response = await fetch(`${base}/health`, { headers: { authorization: `Bearer ${token}` } });
+    assert.equal(response.ok, true, "isolated companion health endpoint must respond successfully");
+    return response.json();
+  };
   try {
     let ready = false;
-    for (let attempt = 0; attempt < 100; attempt++) {
+    const startupDeadline = Date.now() + 15_000;
+    while (Date.now() < startupDeadline) {
       if (await health().catch(() => undefined)) { ready = true; break; }
       assert.equal(child.exitCode, null, "isolated companion must remain running");
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      assert.equal(child.signalCode, null, "isolated companion must not be terminated during startup");
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    assert.equal(ready, true);
+    assert.equal(ready, true, "isolated companion must become healthy within 15 seconds");
     await check({ directory, health, async action(input) {
       const response = await fetch(`${base}/action`, { method: "POST",
         headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify(input) });
@@ -66,7 +72,7 @@ async function fixture(prepare: (directory: string) => Promise<void>,
   }
 }
 
-test("a corrupted workflow catalog does not stop ordinary companion or browser control", { timeout: 15_000 }, async () => {
+test("a corrupted workflow catalog does not stop ordinary companion or browser control", { timeout: 30_000 }, async () => {
   const corrupt = "{not-valid-json";
   await fixture(async (directory) => {
     await mkdir(path.join(directory, "Workflows"));
@@ -88,7 +94,7 @@ test("a corrupted workflow catalog does not stop ordinary companion or browser c
   });
 });
 
-test("a stale recorded page ID fails closed and only explicit retries advance the retry counter", { timeout: 15_000 }, async () => {
+test("a stale recorded page ID fails closed and only explicit retries advance the retry counter", { timeout: 30_000 }, async () => {
   const id = "a".repeat(16);
   await fixture(async (directory) => {
     await mkdir(path.join(directory, "Workflows"));

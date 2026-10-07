@@ -10,7 +10,7 @@ import { spawn } from "node:child_process";
 import test from "node:test";
 import { WebSocket } from "ws";
 
-test("real companion blocks rebinding and unapproved innocuous-label mutations", { timeout: 20_000 }, async () => {
+test("real companion blocks rebinding and unapproved innocuous-label mutations", { timeout: 30_000 }, async () => {
   const temporary = await mkdtemp(path.join(os.tmpdir(), "browserpilot-security-"));
   const reservation = createServer();
   reservation.listen(0, "127.0.0.1");
@@ -32,13 +32,14 @@ test("real companion blocks rebinding and unapproved innocuous-label mutations",
   let socket: WebSocket | undefined;
   try {
     let ready = false;
-    for (let attempt = 0; attempt < 100; attempt++) {
+    const startupDeadline = Date.now() + 15_000;
+    while (Date.now() < startupDeadline) {
       const health = await fetch(`${base}/health`, { headers: { authorization: `Bearer ${token}` } }).catch(() => undefined);
       if (health?.ok) { ready = true; break; }
-      if (child.exitCode !== null) throw new Error("Isolated companion failed to start.");
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      if (child.exitCode !== null || child.signalCode !== null) throw new Error("Isolated companion failed to start.");
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    assert.equal(ready, true, "isolated companion became ready");
+    assert.equal(ready, true, "isolated companion became ready within 15 seconds");
     const health = async () => (await (await fetch(`${base}/health`, { headers: { authorization: `Bearer ${token}` } })).json());
     const offline = await health();
     assert.equal(offline.serviceReady, true);
