@@ -16,6 +16,7 @@ import { ExtensionController } from "./extension-controller";
 import { Workflows } from "./workflows";
 import { siteSchema } from "./site-adapters";
 import { fetchPublicImage } from "./image-download";
+import { ObservationHistory } from "./observations";
 
 const settings = await loadConfig();
 applyConfigEnvironment(settings);
@@ -89,6 +90,7 @@ const extensionBridge = new ExtensionBridge(createHmac("sha256", token).update("
 const files = new BrowserFiles(downloadDir, uploadDir);
 const approvals = new ApprovalGate(`http://${host}:${port}/approvals`);
 const workflows = new Workflows(path.join(path.dirname(profileDir), "Workflows"));
+const observations = new ObservationHistory();
 let browser: BrowserController;
 let handedOff = false;
 const activeProfileId = () => extensionMode ? extensionBridge.activeId : profiles.activeId;
@@ -162,13 +164,46 @@ async function guardedAction(input: Action, pageId: string | undefined, details:
   const action = { request: { ...input, approvalId: undefined }, profileId: activeProfileId(),
     pageId: pageId || browser.activePageId, url, ...details };
   if (!approvals.consume("approvalId" in input ? input.approvalId : undefined, action)) {
-    return approvals.prepare(action, description, { profileId: action.profileId, pageId: action.pageId,
-      url: displayUrl(url), request: action.request, ...details });
+    return approvals.prepare(action, description, {
+      actionDestination: { profileId: action.profileId, pageId: action.pageId, url: displayUrl(url).slice(0, 512) },
+      observationNotice: "Recent page content supplied to the agent; historical context, not proof of what triggered this action. URLs omit queries/fragments and are limited to 512 characters. This list is frozen for this approval.",
+      recentPageObservations: observations.recent(action.profileId),
+      noObservationNotice: observations.recent(action.profileId).length ? undefined : "No prior page observation recorded.",
+      profileId: action.profileId, pageId: action.pageId, url: displayUrl(url), request: action.request, ...details });
   }
   return execute();
 }
 
+const observationActions = new Set(["open", "snapshot", "scroll", "screenshot", "observe", "select_tab",
+  "new_tab", "navigate", "find", "extract", "visual_read", "site_extract", "pdf", "save_element_image", "save_image"]);
+const stableReadActions = new Set(["snapshot", "screenshot", "observe", "find", "extract", "visual_read", "site_extract", "pdf", "save_element_image", "save_image"]);
+
 async function run(input: Action): Promise<unknown> {
+  if (handedOff && !["status", "resume", "handoff", "snapshot", "tabs", "diagnostics", "workflow_status"].includes(input.type)) {
+    throw new Error("BrowserPilot is paused for human takeover. Resume after completing the browser step.");
+  }
+  let before: string | undefined;
+  if (stableReadActions.has(input.type)) {
+    await ensureBrowserPage();
+    before = await browser.currentUrl("pageId" in input ? input.pageId : undefined);
+  }
+  const result = await executeAction(input);
+  if (observationActions.has(input.type)) {
+    // Observation failures must not turn a completed operation into an apparent failure.
+    try {
+      const resultPageId = result && typeof result === "object" && "pageId" in result ? String(result.pageId) : undefined;
+      const pageId = resultPageId || ("pageId" in input ? input.pageId : undefined) || browser.activePageId;
+      const after = await browser.currentUrl(pageId);
+      const snapshotUrl = result && typeof result === "object" && "url" in result && typeof result.url === "string" ? result.url : undefined;
+      if ((before === undefined || before === after) && (snapshotUrl === undefined || displayUrl(snapshotUrl) === displayUrl(after))) {
+        observations.record(activeProfileId(), pageId, after, input.type);
+      }
+    } catch { /* A closed or navigating tab cannot provide reliable observation metadata. */ }
+  }
+  return result;
+}
+
+async function executeAction(input: Action): Promise<unknown> {
   if (handedOff && !["status", "resume", "handoff", "snapshot", "tabs", "diagnostics", "workflow_status"].includes(input.type)) {
     throw new Error("BrowserPilot is paused for human takeover. Resume after completing the browser step.");
   }

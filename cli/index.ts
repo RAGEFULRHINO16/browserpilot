@@ -8,7 +8,7 @@ import { createBrowserPilotServer } from "../mcp/server";
 import { clientConfiguration, doctorReport, formatDoctorReport, setupSteps, type McpClient } from "./diagnostics";
 import { ensureCompanion, inspectCompanion, ManagedCompanion, stopOwnedCompanion } from "./runtime";
 
-const help = `BrowserPilot 0.5.2
+const help = `BrowserPilot 0.5.3
 
 Commands:
   setup [--port 8765] [--backend extension|playwright] [--headless] [--browser-path PATH] [--client claude|codex|generic] [--json]
@@ -28,7 +28,7 @@ Use npm ci --workspaces=false for stdio-only installs; add the optional HTTP ada
 async function main(): Promise<void> {
   const [command = "help", ...args] = process.argv.slice(2);
   if (["help", "--help", "-h"].includes(command)) { process.stdout.write(help); return; }
-  if (["--version", "version"].includes(command)) { process.stdout.write("0.5.2\n"); return; }
+  if (["--version", "version"].includes(command)) { process.stdout.write("0.5.3\n"); return; }
   if (!["init", "setup", "doctor", "pair", "start", "status", "mcp"].includes(command)) throw new Error(`Unknown command: ${command}. Run browserpilot --help.`);
   const valueFlags = ["--port", "--backend", "--browser-path", "--startup-timeout-ms", "--timeout-ms", "--client"];
   const booleanFlags = ["--headless", "--json"];

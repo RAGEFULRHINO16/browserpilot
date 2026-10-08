@@ -1,7 +1,7 @@
 {
   "name": "browserpilot",
   "type": "module",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "workspaces": [
     "web-adapter"
   ],

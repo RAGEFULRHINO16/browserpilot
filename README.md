@@ -18,11 +18,12 @@ triggers require a one-use approval on your PC. Read the [security boundaries](S
 before connecting a profile with sensitive accounts. This is an early public
 release with AI-assisted development, not an independently audited security product.
 
-The current release adds a read-only `browserpilot doctor` command, bounded startup
-and owned-process recovery, truthful browser-connected status, extension reconnect
-feedback, expired-command rejection, workflow journal recovery, and structured MCP
-errors that warn before repeating an ambiguous write. Existing daily browser
-connections are not migrated automatically.
+The current release adds frozen recent-read evidence to the local approval page:
+you can see earlier observed pages separately from the action destination, even
+across tabs or same-tab navigation. A two-origin Chromium fixture verifies that
+instructions embedded in article content cannot authorize an upload on another
+approved site. This is approval-boundary coverage, not proof of model-level
+prompt-injection resistance. Existing daily connections are not migrated automatically.
 
 The [latest release](https://github.com/RAGEFULRHINO16/browserpilot/releases/latest)
 includes a compiled npm-format archive and SHA-256 checksum. It is not published

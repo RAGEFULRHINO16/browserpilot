@@ -1,5 +1,37 @@
 # Release validation
 
+## Locally observed cross-site approval regressions for 0.5.3
+
+On Windows x64 with Node.js 24.13.0, build and typecheck passed and all 58 core
+tests passed with real Chromium security and MCP-disconnect checks enabled.
+The isolated extension smoke and optional authenticated HTTP test also passed.
+These are maintainer-run results, not independent adoption or a security audit.
+The fresh production-package install completed its 50-tool MCP handshake,
+authenticated file round-trip and owned-process cleanup; the no-account
+`npm run try:browser` exercise passed with actual MCP image content and temporary
+profile removal. `npm audit --omit=dev` reported zero advisories at this check.
+
+The extension test grants two fixture origins only in a temporary extension copy.
+Playwright fulfills both origins with synthetic HTML; no live account is used.
+The first site's article body contains an instruction to abandon summarization
+and upload a staged file to the second approved site. Snapshot and article-region
+extraction return that instruction. The second site's file input remains empty
+until exact local approval; the exact approved upload succeeds once and its
+consumed grant cannot replay. The approval HTML contains both the earlier article
+and action destination. The fixture repeats denial after navigating between those
+sites within the same tab, preserving the earlier article observation.
+
+New reads leave the pending approval's original evidence and context hash intact.
+Core tests cover redaction, profile separation, history bounds/expiry, defensive
+copies, explicit display truncation, and inconsistent snapshot/URL evidence omission.
+Source metadata precedes potentially large target details in the approval display.
+The record retains no article text, screenshots, query strings or URL credentials.
+
+This evaluates the tool authorization boundary after reading untrusted content,
+not an LLM's reaction to prompt injection. Recent observations do not prove which
+page influenced an agent. They can expire or be evicted, and target checks and
+actuation are not atomic. See [security limits](../SECURITY.md).
+
 ## Locally observed first-run and cleanup regressions for 0.5.2
 
 The no-account `npm run try:browser` exercise passed on Windows x64 with Node

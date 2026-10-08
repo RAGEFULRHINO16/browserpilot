@@ -52,3 +52,30 @@ test("pending approval storage is bounded", () => {
   for (let index = 0; index < 128; index++) gate.prepare({ index }, "action");
   assert.throws(() => gate.prepare({ index: 128 }, "action"), /Too many/);
 });
+
+test("approval evidence is immutable and hashed alongside the exact request", () => {
+  const gate = new ApprovalGate();
+  const action = { type: "click", pageId: "page-2" };
+  const context = { recentPageObservations: [{ url: "https://example.com/article" }] };
+  const pending = gate.prepare(action, "Continue", context);
+  const frozen = JSON.stringify(context, null, 2);
+  assert.equal(pending.contextDigest, createHash("sha256").update(JSON.stringify({ action, context: frozen })).digest("hex"));
+  context.recentPageObservations[0].url = "https://forged.example/";
+  const retry = gate.prepare(action, "Changed description", context);
+  assert.equal(retry.approvalId, pending.approvalId);
+  assert.equal(retry.contextDigest, pending.contextDigest);
+  assert.ok(gate.html().includes("https://example.com/article"));
+  assert.equal(gate.html().includes("https://forged.example/"), false);
+});
+
+test("bounded observation evidence precedes large, explicitly truncated display details", () => {
+  const gate = new ApprovalGate();
+  const context = { actionDestination: { url: "https://example.org/destination" },
+    recentPageObservations: Array.from({ length: 8 }, (_, index) => ({ url: `https://example.com/article-${index}/${"a".repeat(450)}` })),
+    target: { fingerprint: "a".repeat(20_000) } };
+  gate.prepare({ type: "click", target: context.target }, "Continue", context);
+  const html = gate.html();
+  assert.ok(html.includes("https://example.org/destination"));
+  for (let index = 0; index < 8; index++) assert.ok(html.includes(`https://example.com/article-${index}/`));
+  assert.ok(html.includes("Remaining display details truncated"));
+});
