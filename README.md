@@ -167,6 +167,13 @@ exact request and its bound context. This is an identifier, not a security seal.
 Changed URLs, targets or entered text invalidate the approval. The local approval page
 is never included as a remotely controllable agent tab.
 
+Open the returned `approvalUrl` yourself and check your browser's address bar:
+it must be your configured `http://127.0.0.1:<port>/approvals` page. A website can
+copy the approval screen's appearance, text or hash; those are not proof that it
+is the local companion. Do not approve through a webpage's embedded panel or
+enter pairing credentials into a lookalike. Review the action destination and
+entered values on the actual local page before approving.
+
 Files selected for upload must first be staged with `browser_stage_file` or
 downloaded into the configured BrowserPilot folder. File IDs do not grant access
 to arbitrary paths. Extension downloads use your browser's default Downloads
