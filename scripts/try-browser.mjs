@@ -15,6 +15,9 @@ let client;
 let transport;
 let port;
 let completed = false;
+let phase = "local setup";
+let startupStderr = Buffer.alloc(0);
+let startupDiagnostic;
 
 try {
   await new Promise((resolve, reject) => {
@@ -27,6 +30,8 @@ try {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key, value]) =>
     value !== undefined && !key.toUpperCase().startsWith("BROWSERPILOT_")));
   Object.assign(env, {
+    // Keep Playwright's startup artifacts inside the exercise's owned cleanup.
+    TEMP: temp, TMP: temp, TMPDIR: temp,
     BROWSERPILOT_DATA_DIR: temp,
     BROWSERPILOT_CONFIG_PATH: path.join(temp, "config.json"),
     BROWSERPILOT_COMPANION_TOKEN: randomBytes(48).toString("base64url"),
@@ -40,10 +45,24 @@ try {
   console.log("Opening https://example.com in temporary sandboxed Chromium. No account or model API key is used.");
   transport = new StdioClientTransport({ command: process.execPath,
     args: [path.join(root, "dist", "cli", "index.js"), "mcp"], env, stderr: "pipe" });
+  // Drain the pipe so startup errors cannot block the child. Keep only bounded
+  // diagnostic context; never print raw server logs, paths or credential content.
+  transport.stderr?.on("data", (chunk) => {
+    if (phase !== "MCP startup") return;
+    startupStderr = Buffer.concat([startupStderr, Buffer.from(chunk)]).subarray(-16_384);
+    const diagnostic = startupStderr.toString("utf8");
+    if (/Executable doesn't exist/i.test(diagnostic)) startupDiagnostic = "missing_browser";
+    else if (/Host system is missing dependencies|error while loading shared libraries/i.test(diagnostic)) startupDiagnostic = "missing_dependencies";
+  });
   client = new Client({ name: "browserpilot-first-run", version: "1.0.0" });
+  phase = "MCP startup";
   await client.connect(transport, { timeout: 60_000 });
+  phase = "MCP tool listing";
+  startupStderr = Buffer.alloc(0);
+  startupDiagnostic = undefined;
   const tools = (await client.listTools()).tools;
   const call = async (name, args = {}) => {
+    phase = name;
     const response = await client.callTool({ name, arguments: args }, undefined, { timeout: 60_000 });
     if (response.isError) throw new Error(`${name} failed: ${JSON.stringify(response.structuredContent?.error || response.content)}`);
     return response;
@@ -67,8 +86,14 @@ try {
     fileRoundTrip: true, dailyProfileUsed: false, websiteWritesPerformed: false }, null, 2));
   completed = true;
 } catch (error) {
-  console.error(error instanceof Error ? error.message : String(error));
-  console.error("Check Node 22+, run npx playwright install chromium, and confirm HTTPS access to example.com. Linux may need Chromium system libraries; use your OS-approved installation process. No sandbox bypass is provided.");
+  console.error(`Failed during ${phase}: ${error instanceof Error ? error.message : String(error)}`);
+  if (phase === "MCP startup" && startupDiagnostic === "missing_browser") {
+    console.error("Chromium is missing from the configured Playwright browser cache. Run npx playwright install chromium in this same environment, then rerun npm run try:browser.");
+  } else if (phase === "MCP startup" && startupDiagnostic === "missing_dependencies") {
+    console.error("Chromium system libraries are missing. Install them through your OS-approved installation process, then rerun npm run try:browser. No sandbox bypass is provided.");
+  } else {
+    console.error("Check Node 22+, run npx playwright install chromium, and confirm HTTPS access to example.com. Linux may need Chromium system libraries; use your OS-approved installation process. No sandbox bypass is provided.");
+  }
   process.exitCode = 1;
 } finally {
   if (probe.listening) await new Promise((resolve) => probe.close(resolve));

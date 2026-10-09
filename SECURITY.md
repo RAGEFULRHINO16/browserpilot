@@ -46,6 +46,13 @@ profile sandbox. Use a separate browser profile for sensitive work. Browsed page
 and agent instructions are untrusted: local approvals reduce accidental writes
 but do not establish that an action is wise or authorized by an account owner.
 
+The approval screen's appearance and displayed hashes are not an authenticity
+signal: an untrusted website can imitate them. Open the companion's returned
+loopback approval URL directly and verify the configured port in the browser's
+address bar. Host/Origin checks and a per-process CSRF value protect the real
+approval endpoint; they do not prevent a website from drawing a counterfeit UI
+or persuading a person to approve an unsafe request on the real local page.
+
 The browser can make its own requests and redirects. Website permissions and
 public-address checks do not provide firewall-level network isolation or pin the
 browser's DNS connections. Use OS network restrictions if that boundary matters.
